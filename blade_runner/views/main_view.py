@@ -399,6 +399,8 @@ class MainView(tk.Toplevel):
         # Settins scene logic
         elif self.curr_scene == "settings_scene":
             self._grid_forget_settings_scene()
+            # Reload configs before switching scenes.
+            self._controller.reload_configs()
             if self.prev_scene == "selection_scene":
                 self._selection_scene()
             elif self.prev_scene == "offboard_scene":
@@ -417,6 +419,10 @@ class MainView(tk.Toplevel):
         Returns:
             void
         """
+        # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+        # If the current scene is the settings scene, reload the configs before switching to the help scene.
+        if curr_scene == "settings_scene":
+            self._controller.reload_configs()
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Set previous scene.
         if curr_scene != "help_scene":

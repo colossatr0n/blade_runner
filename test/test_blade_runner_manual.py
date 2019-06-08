@@ -32,7 +32,6 @@ Current working directory must be Blade Runner, as in Contents/Resources/Blade\ 
 import os
 import sys
 import logging
-import plistlib
 import unittest
 import subprocess
 import Tkinter as tk
@@ -41,7 +40,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "blade_runner/dependencies"))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "blade_runner/slack"))
 
-from blade_runner.jamf_pro.jss_server import JssServer
 from blade_runner.controllers.main_controller import MainController
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -60,29 +58,10 @@ class TestBladeRunnerManual(unittest.TestCase):
         abs_file_path = os.path.abspath(__file__)
         self.blade_runner_dir = os.path.dirname(abs_file_path)
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-        # Get Jamf Pro settings.
-        jss_server_plist = os.path.join(self.blade_runner_dir, "config/jamf_pro_configs/jamf_pro.plist")
-        jss_server_data = plistlib.readPlist(jss_server_plist)
-        jss_server = JssServer(**jss_server_data)
-
-        # Get Slack settings.
-        self.slack_plist = os.path.join(self.blade_runner_dir, "config/slack_configs/slack.plist")
-        self.slack_data = plistlib.readPlist(self.slack_plist)
-
-        # Get verification parameter settings
-        self.verify_config = os.path.join(self.blade_runner_dir, "config/verify_params_configs/verify_params.plist")
-        self.verify_data = plistlib.readPlist(self.verify_config)
-
-        # Get search parameter settings.
-        self.search_params_config = os.path.join(self.blade_runner_dir, "config/search_params_configs/search_params.plist")
-        self.search_params = plistlib.readPlist(self.search_params_config)
-
-        # Get document settings.
-        self.print_config = os.path.join(self.blade_runner_dir, "config/print_config/print.plist")
-        self.print_settings = plistlib.readPlist(self.print_config)
+        self.config_dir = os.path.join(self.blade_runner_dir, "config")
 
         # Set up main controller.
-        self.br = MainController(root, jss_server, self.slack_data, self.verify_data, self.search_params, self.print_settings)
+        self.br = MainController(root, self.config_dir)
 
     def test_manual(self):
         """Manually test Blade Runner."""

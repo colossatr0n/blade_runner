@@ -57,26 +57,70 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 class MainController(Controller):
-    """Blade-Runner's main controller."""
+    """Blade Runner main controller."""
 
-    def __init__(self, root, server, slack_data, verify_params, search_params, doc_settings):
+    def __init__(self, root, config_dir):
         """Initialize the main controller.
 
         Args:
             root: The root Tk window.
-            server (JssServer): The JSS server to connect to.
-            slack_data (dict): Slack configuration data.
-            verify_params (dict): Verification parameters configuration data.
-            search_params (dict): Search parameters configuration data.
+            config_dir (str): Path to the configuration directory. See Notes below.
+
+        Notes:
+
+            config_dir must contain the following directory structure with the accompanying configuration files,
+            though the configuration file(s) shown in offboard_configs may have a different name.
+
+            +---config_dir
+            |   +---jamf_pro_configs
+            |   |   /---jamf_pro.plist
+            |   +---offboard_configs
+            |   |   /---an_offboard_config
+            |   |   /---another_offboard_config
+            |   +---print_config
+            |   |   /---print.plist
+            |   +---python_bin_config
+            |   |   /---python_bin.plist
+            |   +---search_params_configs
+            |   |   /---search_params.plist
+            |   +---slack_configs
+            |   |   /---slack.plist
+            |   +---verify_params_configs
+            |   |   /---verify_params.plist
+            -------------
+
         """
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+        # Get logger.
         self.logger = logging.getLogger(__name__)
+        # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+        # Initialize config paths
+        self._config_dir = config_dir
+        self._jamf_pro_config_path = os.path.join(config_dir, "jamf_pro_configs/jamf_pro.plist")
+        self._slack_config_path = os.path.join(config_dir, "slack_configs/slack.plist")
+        self._verify_config_path = os.path.join(config_dir, "verify_params_configs/verify_params.plist")
+        self._search_config_path = os.path.join(config_dir, "search_params_configs/search_params.plist")
+        self._print_config_path = os.path.join(config_dir, "print_config/print.plist")
+        self._python_bin_config_path = os.path.join(config_dir, "python_bin_config/python_bin.plist")
+        self._offboard_configs_dir = os.path.join(config_dir, "offboard_configs")
+        # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+        # Check arg type. If it's a string, process as path and create dictionary, otherwise just save it.
+        jss_server_data = plistlib.readPlist(self._jamf_pro_config_path)
+        self._jss_server = JssServer(**jss_server_data)
+
+        self._slack_data = plistlib.readPlist(self._slack_config_path)
+
+        verify_params_data = plistlib.readPlist(self._verify_config_path)
+        self.verify_params = VerifyParams(verify_params_data)
+
+        search_params_data = plistlib.readPlist(self._search_config_path)
+        self.search_params = SearchParams(search_params_data)
+
+        self._doc_settings = plistlib.readPlist(self._print_config_path)
+        # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Set report callback so that a Tk window will appear with the exception message when an exception occurs.
         self._root = root
         self._root.report_callback_exception = self._exception_messagebox
-        # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-        # JSS server
-        self._jss_server = server
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Stores information about the computer
         self._computer = Computer()
@@ -93,31 +137,55 @@ class MainController(Controller):
         self._search_controller = None
         self._verify_controller = None
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-        # Set whether or not a JSSDoc will be printed to a printer.
-        self._doc_settings = doc_settings
-        # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-        # Set configuration data
+        # Initialize offboard config.
         self._offboard_config = None
-        self._slack_data = slack_data
-        self.verify_params = VerifyParams(verify_params)
-        self.search_params = SearchParams(search_params)
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Save Verify/SearchParams original input
-        self.verify_params_input = verify_params
-        self.search_params_input = search_params
+        self._verify_params_arg = verify_params_data
+        self._search_params_arg = search_params_data
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Set path to config directory that contains the configuration files.
-
         app_root_dir = os.path.abspath(__file__)
         for i in range(3):
             app_root_dir = os.path.dirname(app_root_dir)
 
         self.app_root_dir = app_root_dir
-        self._config_dir = os.path.join(self.app_root_dir, "config")
+        # self._config_dir = os.path.join(self.app_root_dir, "config")
         self._blade_runner_dir = os.path.join(self.app_root_dir, "blade_runner")
         self._slack_dir = os.path.join(self._blade_runner_dir, "slack")
-        self._offboard_configs_dir = os.path.join(self._config_dir, "offboard_configs")
+        # self._offboard_configs_dir = os.path.join(self._config_dir, "offboard_configs")
         self._secure_erase_dir = os.path.join(self._blade_runner_dir, "secure_erase")
+
+    def reload_configs(self):
+        """Reloads configuration files if the path to the config has been specified.
+
+        Returns:
+            void
+        """
+        if self._jamf_pro_config_path:
+            jss_server_data = plistlib.readPlist(self._jamf_pro_config_path)
+            self.logger.debug(jss_server_data)
+            self._jss_server = JssServer(**jss_server_data)
+
+        if self._slack_config_path:
+            self._slack_data = plistlib.readPlist(self._slack_config_path)
+            self.logger.debug(self._slack_data)
+
+        if self._verify_config_path:
+            verify_params_data = plistlib.readPlist(self._verify_config_path)
+            self.logger.debug(verify_params_data)
+            self.verify_params = VerifyParams(verify_params_data)
+
+        if self._search_config_path:
+            search_params_data = plistlib.readPlist(self._search_config_path)
+            self.logger.debug(search_params_data)
+            self.search_params = SearchParams(search_params_data)
+
+        if self._print_config_path:
+            self._doc_settings = plistlib.readPlist(self._print_config_path)
+            self.logger.debug(self._doc_settings)
+
+        self.logger.info("Reloaded configuration files.")
 
     def _exception_messagebox(self, exc, value, traceback):
         """Displays a message box with the accompanying exception message whenver an exception occurs.
@@ -191,10 +259,10 @@ class MainController(Controller):
         self._computer = Computer()
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Create a new VerifyParams object.
-        self.verify_params = VerifyParams(self.verify_params_input)
+        self.verify_params = VerifyParams(self._verify_params_arg)
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Create a new SearchParams object.
-        self.search_params = SearchParams(self.search_params_input)
+        self.search_params = SearchParams(self._search_params_arg)
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         self.logger.info("Blade-Runner reset.")
 
@@ -583,27 +651,28 @@ class MainController(Controller):
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Determine the path to the configuration file.
         if config_id == "slack":
-            path = "slack_configs/slack.plist"
+            path = self._slack_config_path
         elif config_id == "offboard":
-            path = "offboard_configs/"
+            path = os.path.join(self._config_dir, "offboard_configs")
         elif config_id == "verify":
-            path = "verify_params_configs/verify_params.plist"
+            path = self._verify_config_path
         elif config_id == "search":
-            path = "search_params_configs/search_params.plist"
+            path = self._search_config_path
         elif config_id == "config":
-            path = ""
+            path = self._config_dir
         elif config_id == "print":
-            path = "print_config/print.plist"
+            path = self._print_config_path
         elif config_id == "python_bin":
-            path = "python_bin_config/python_bin.plist"
+            path = self._python_bin_config_path
         elif config_id == "jamf_pro":
-            path = "jamf_pro_configs/jamf_pro.plist"
+            path = self._jamf_pro_config_path
         else:
             self.logger.warn("No configuration ID matches \"{}\"".format(config_id))
             raise SystemError("No configuration ID matches \"{}\"".format(config_id))
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Open the file in its default application
-        subprocess.check_output(["open", os.path.join(self._config_dir, path)])
+        if path:
+            subprocess.check_output(["open", path])
 
     def cat_readme(self):
         """Outputs the text of README.md.
@@ -656,30 +725,11 @@ def main():
     for i in range(3):
         blade_runner_dir = os.path.dirname(blade_runner_dir)
     # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-    # Read from jss config plist and set up the Jamf Pro server
-    jss_server_plist = os.path.join(blade_runner_dir, "config/jamf_pro_configs/jamf_pro.plist")
-    jss_server_data = plistlib.readPlist(jss_server_plist)
-    jss_server = JssServer(**jss_server_data)
-    logger.debug(jss_server._jss_url)
-
-    # Read from Slack config plist to set up Slack notifications
-    slack_plist = os.path.join(blade_runner_dir, "config/slack_configs/slack.plist")
-    slack_data = plistlib.readPlist(slack_plist)
-
-    # Read from verify params plist to set up verification parameters
-    verify_config = os.path.join(blade_runner_dir, "config/verify_params_configs/verify_params.plist")
-    verify_params = plistlib.readPlist(verify_config)
-
-    # Read from search params plist to set up search parameters.
-    search_params_config = os.path.join(blade_runner_dir, "config/search_params_configs/search_params.plist")
-    search_params = plistlib.readPlist(search_params_config)
-
-    # Read from print config to enable or disable printing.
-    print_config = os.path.join(blade_runner_dir, "config/print_config/print.plist")
-    print_settings = plistlib.readPlist(print_config)
+    # Path to configuration directory.
+    config_dir = os.path.join(blade_runner_dir, "config")
     # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
     # Run the application
-    app = MainController(root, jss_server, slack_data, verify_params, search_params, print_settings)
+    app = MainController(root, config_dir)
     app.run()
     logger.info("Blade Runner exiting.")
 
