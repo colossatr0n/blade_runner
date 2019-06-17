@@ -110,11 +110,11 @@ class MainController(Controller):
 
         self._slack_data = plistlib.readPlist(self._slack_config_path)
 
-        verify_params_data = plistlib.readPlist(self._verify_config_path)
-        self.verify_params = VerifyParams(verify_params_data)
+        self._verify_params_data = plistlib.readPlist(self._verify_config_path)
+        self.verify_params = VerifyParams(self._verify_params_data)
 
-        search_params_data = plistlib.readPlist(self._search_config_path)
-        self.search_params = SearchParams(search_params_data)
+        self._search_params_data = plistlib.readPlist(self._search_config_path)
+        self.search_params = SearchParams(self._search_params_data)
 
         self._doc_settings = plistlib.readPlist(self._print_config_path)
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
@@ -140,20 +140,14 @@ class MainController(Controller):
         # Initialize offboard config.
         self._offboard_config = None
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-        # Save Verify/SearchParams original input
-        self._verify_params_arg = verify_params_data
-        self._search_params_arg = search_params_data
-        # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Set path to config directory that contains the configuration files.
         app_root_dir = os.path.abspath(__file__)
         for i in range(3):
             app_root_dir = os.path.dirname(app_root_dir)
 
         self.app_root_dir = app_root_dir
-        # self._config_dir = os.path.join(self.app_root_dir, "config")
         self._blade_runner_dir = os.path.join(self.app_root_dir, "blade_runner")
         self._slack_dir = os.path.join(self._blade_runner_dir, "slack")
-        # self._offboard_configs_dir = os.path.join(self._config_dir, "offboard_configs")
         self._secure_erase_dir = os.path.join(self._blade_runner_dir, "secure_erase")
 
     def reload_configs(self):
@@ -164,26 +158,21 @@ class MainController(Controller):
         """
         if self._jamf_pro_config_path:
             jss_server_data = plistlib.readPlist(self._jamf_pro_config_path)
-            self.logger.debug(jss_server_data)
             self._jss_server = JssServer(**jss_server_data)
 
         if self._slack_config_path:
             self._slack_data = plistlib.readPlist(self._slack_config_path)
-            self.logger.debug(self._slack_data)
 
         if self._verify_config_path:
-            verify_params_data = plistlib.readPlist(self._verify_config_path)
-            self.logger.debug(verify_params_data)
-            self.verify_params = VerifyParams(verify_params_data)
+            self._verify_params_data = plistlib.readPlist(self._verify_config_path)
+            self.verify_params = VerifyParams(self._verify_params_data)
 
         if self._search_config_path:
-            search_params_data = plistlib.readPlist(self._search_config_path)
-            self.logger.debug(search_params_data)
-            self.search_params = SearchParams(search_params_data)
+            self._search_params_data = plistlib.readPlist(self._search_config_path)
+            self.search_params = SearchParams(self._search_params_data)
 
         if self._print_config_path:
             self._doc_settings = plistlib.readPlist(self._print_config_path)
-            self.logger.debug(self._doc_settings)
 
         self.logger.info("Reloaded configuration files.")
 
@@ -259,10 +248,10 @@ class MainController(Controller):
         self._computer = Computer()
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Create a new VerifyParams object.
-        self.verify_params = VerifyParams(self._verify_params_arg)
+        self.verify_params = VerifyParams(self._verify_params_data)
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         # Create a new SearchParams object.
-        self.search_params = SearchParams(self._search_params_arg)
+        self.search_params = SearchParams(self._search_params_data)
         # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
         self.logger.info("Blade-Runner reset.")
 
